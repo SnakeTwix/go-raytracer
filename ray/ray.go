@@ -1,51 +1,54 @@
 package ray
 
 import (
+	"gonum.org/v1/gonum/mat"
 	"math"
-	"raytracer/vec3"
 )
 
 type Ray struct {
-	Origin    *vec3.Point3
-	Direction *vec3.Vec3
+	Origin    *mat.VecDense
+	Direction *mat.VecDense
 }
 
-func (r *Ray) at(t float64) vec3.Point3 {
-	scaled := r.Direction.MulNew(t)
-	scaled.AddVec(r.Origin)
+func (r *Ray) at(t float64) *mat.VecDense {
+	scaled := mat.NewVecDense(3, nil)
+	scaled.ScaleVec(t, r.Direction)
+	scaled.AddVec(scaled, r.Origin)
 
 	return scaled
 }
 
-func (r *Ray) Color() vec3.Color {
-	sphereCenter := vec3.Point3{Z: -1.0}
-	t := hitSphere(&sphereCenter, 0.5, r)
+func (r *Ray) Color() *mat.VecDense {
+	sphereCenter := mat.NewVecDense(3, []float64{0, 0, -1.})
+	t := hitSphere(sphereCenter, 0.5, r)
 	if t > 0.0 {
 		n := r.at(t)
-		n.SubVec(&sphereCenter)
-		n.Unit()
+		n.SubVec(n, sphereCenter)
+		// Getting the unit vector hasn't been so complicated ever
+		n.ScaleVec(1./n.Norm(2), n)
 
-		color := vec3.Color{X: n.X + 1, Y: n.Y + 1, Z: n.Z + 1}
-		color.Mul(0.5)
+		color := mat.NewVecDense(3, []float64{n.AtVec(0) + 1, n.AtVec(1) + 1, n.AtVec(2) + 1})
+		color.ScaleVec(0.5, color)
 
 		return color
 	}
 
-	unitDir := r.Direction.UnitNew()
-	a := 0.5 * (unitDir.Y + 1.0)
+	unitDir := mat.NewVecDense(3, nil)
+	// Unit again
+	unitDir.ScaleVec(1/r.Direction.Norm(2), r.Direction)
+	a := 0.5 * (unitDir.AtVec(1) + 1.0)
 
-	firstColor := vec3.Color{X: 1.0, Y: 1.0, Z: 1.0}
-	firstColor.Mul(1.0 - a)
+	firstColor := mat.NewVecDense(3, []float64{1, 1, 1.})
+	firstColor.ScaleVec(1.0-a, firstColor)
 
-	secondColor := vec3.Color{X: 0.5, Y: 0.7, Z: 1.0}
-	secondColor.Mul(a)
+	secondColor := mat.NewVecDense(3, []float64{0.5, 0.7, 1.})
+	secondColor.ScaleVec(a, secondColor)
 
-	firstColor.AddVec(&secondColor)
-
+	firstColor.AddVec(firstColor, secondColor)
 	return firstColor
 }
 
-// func hitSphere(center *vec3.Point3, radius float64, r *Ray) float64 {
+// func hitSphere(center **mat.VecDense, radius float64, r *Ray) float64 {
 // 	oc := center.SubVecNew(r.Origin)
 // 	a := r.Direction.Dot(r.Direction)
 // 	b := r.Direction.Dot(&oc) * -2.0
@@ -60,11 +63,13 @@ func (r *Ray) Color() vec3.Color {
 // 	}
 // }
 
-func hitSphere(center *vec3.Point3, radius float64, r *Ray) float64 {
-	oc := center.SubVecNew(r.Origin)
-	a := r.Direction.LengthSquared()
-	h := r.Direction.Dot(&oc)
-	c := oc.LengthSquared() - radius*radius
+func hitSphere(center *mat.VecDense, radius float64, r *Ray) float64 {
+	oc := mat.NewVecDense(3, nil)
+	oc.SubVec(center, r.Origin)
+
+	a := mat.Dot(r.Direction, r.Direction)
+	h := mat.Dot(r.Direction, oc)
+	c := mat.Dot(oc, oc) - radius*radius
 
 	discriminant := h*h - a*c
 

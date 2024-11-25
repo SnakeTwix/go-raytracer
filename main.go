@@ -2,11 +2,31 @@ package main
 
 import (
 	"fmt"
+	"gonum.org/v1/gonum/mat"
+	"io"
 	"log"
 	"os"
 	"raytracer/ray"
-	"raytracer/vec3"
 )
+
+func WriteColor(color *mat.VecDense, buffer io.Writer) {
+	r := color.AtVec(0)
+	g := color.AtVec(1)
+	b := color.AtVec(2)
+
+	ir := int(255.999 * r)
+	ig := int(255.999 * g)
+	ib := int(255.999 * b)
+
+	str := fmt.Sprintf("%d %d %d\n", ir, ig, ib)
+
+	_, err := buffer.Write([]byte(str))
+
+	if err != nil {
+		log.Fatal("Failed to write to buffer: ", err)
+	}
+
+}
 
 func main() {
 	aspectRatio := 16. / 9.
@@ -15,54 +35,66 @@ func main() {
 
 	// Camera
 	focalLength := 1.
-	focalVec := vec3.Vec3{
-		X: 0,
-		Y: 0,
-		Z: focalLength,
-	}
+	focalVec := mat.NewVecDense(3, []float64{0, 0, focalLength})
+
 	viewportHeight := 2.
 	viewportWidth := viewportHeight * (float64(imageWidth) / float64(imageHeight))
-	cameraCenter := vec3.Point3{}
+	cameraCenter := mat.NewVecDense(3, nil)
 
-	viewportU := vec3.Vec3{X: viewportWidth}
-	viewportV := vec3.Vec3{Y: -viewportHeight}
+	viewportU := mat.NewVecDense(3, []float64{viewportWidth, 0, 0})
+	viewportV := mat.NewVecDense(3, []float64{0, -viewportHeight, 0})
 
-	pixelDeltaU := viewportU.DivNew(float64(imageWidth))
-	pixelDeltaV := viewportV.DivNew(float64(imageHeight))
+	pixelDeltaU := mat.NewVecDense(3, nil)
+	pixelDeltaU.ScaleVec(1/float64(imageWidth), viewportU)
 
-	halfViewportU := viewportU.DivNew(2.)
-	halfViewportV := viewportV.DivNew(2.)
+	pixelDeltaV := mat.NewVecDense(3, nil)
+	pixelDeltaV.ScaleVec(1/float64(imageHeight), viewportV)
 
-	viewportUpperLeft := cameraCenter.SubVecNew(&focalVec)
-	viewportUpperLeft.SubVec(&halfViewportU)
-	viewportUpperLeft.SubVec(&halfViewportV)
+	halfViewportU := mat.NewVecDense(3, nil)
+	halfViewportU.ScaleVec(1/2., viewportU)
 
-	offset := pixelDeltaU.AddVecNew(&pixelDeltaV)
-	offset.Mul(0.5)
+	halfViewportV := mat.NewVecDense(3, nil)
+	halfViewportV.ScaleVec(1/2., viewportV)
 
-	startPixel := viewportUpperLeft.AddVecNew(&offset)
+	viewportUpperLeft := mat.NewVecDense(3, nil)
+	viewportUpperLeft.SubVec(cameraCenter, focalVec)
+	viewportUpperLeft.SubVec(viewportUpperLeft, halfViewportU)
+	viewportUpperLeft.SubVec(viewportUpperLeft, halfViewportV)
 
-	stdout := os.Stdout
+	offset := mat.NewVecDense(3, nil)
+	offset.AddVec(pixelDeltaU, pixelDeltaV)
+	offset.ScaleVec(0.5, offset)
+
+	startPixel := mat.NewVecDense(3, nil)
+	startPixel.AddVec(viewportUpperLeft, offset)
+
+	file := os.Stdout
 
 	fmt.Printf("P3\n%d %d\n255\n", imageWidth, imageHeight)
 
 	for j := 0; j < imageHeight; j++ {
 		log.Println("Scanlines remaining: ", imageHeight-j)
 		for i := 0; i < imageWidth; i++ {
-			horizontalOffset := pixelDeltaU.MulNew(float64(i))
-			verticalOffset := pixelDeltaV.MulNew(float64(j))
-			pixelCenter := startPixel.AddVecNew(&horizontalOffset)
-			pixelCenter.AddVec(&verticalOffset)
+			horizontalOffset := mat.NewVecDense(3, nil)
+			horizontalOffset.ScaleVec(float64(i), pixelDeltaU)
 
-			// Likely don't need to create a new vector
-			rayDirection := pixelCenter.SubVecNew(&cameraCenter)
+			verticalOffset := mat.NewVecDense(3, nil)
+			verticalOffset.ScaleVec(float64(j), pixelDeltaV)
+
+			pixelCenter := mat.NewVecDense(3, nil)
+			pixelCenter.AddVec(startPixel, horizontalOffset)
+			pixelCenter.AddVec(pixelCenter, verticalOffset)
+
+			rayDirection := mat.NewVecDense(3, nil)
+			rayDirection.SubVec(pixelCenter, cameraCenter)
+
 			currentRay := ray.Ray{
-				Origin:    &cameraCenter,
-				Direction: &rayDirection,
+				Origin:    cameraCenter,
+				Direction: rayDirection,
 			}
 
 			pixelColor := currentRay.Color()
-			pixelColor.Write(stdout)
+			WriteColor(pixelColor, file)
 		}
 	}
 
