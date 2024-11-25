@@ -6,7 +6,8 @@ import (
 	"io"
 	"log"
 	"os"
-	"raytracer/ray"
+	"raytracer/hit"
+	"raytracer/objects"
 )
 
 func WriteColor(color *mat.VecDense, buffer io.Writer) {
@@ -32,6 +33,14 @@ func main() {
 	aspectRatio := 16. / 9.
 	imageHeight := 1024
 	imageWidth := int(aspectRatio * float64(imageHeight))
+
+	// World
+	world := hit.NewHittableList()
+	sphere1 := objects.NewSphere(mat.NewVecDense(3, []float64{0, 0, -1}), 0.5)
+	world.Add(&sphere1)
+
+	sphere2 := objects.NewSphere(mat.NewVecDense(3, []float64{0, -100.5, -1}), 100)
+	world.Add(&sphere2)
 
 	// Camera
 	focalLength := 1.
@@ -88,12 +97,12 @@ func main() {
 			rayDirection := mat.NewVecDense(3, nil)
 			rayDirection.SubVec(pixelCenter, cameraCenter)
 
-			currentRay := ray.Ray{
+			currentRay := hit.Ray{
 				Origin:    cameraCenter,
 				Direction: rayDirection,
 			}
 
-			pixelColor := currentRay.Color()
+			pixelColor := currentRay.Color(&world)
 			WriteColor(pixelColor, file)
 		}
 	}
