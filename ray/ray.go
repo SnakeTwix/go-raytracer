@@ -42,7 +42,7 @@ func (r *Ray) Color() *mat.VecDense {
 	firstColor.ScaleVec(1.0-a, firstColor)
 
 	secondColor := mat.NewVecDense(3, []float64{0.5, 0.7, 1.})
-	secondColor.ScaleVec(a, firstColor)
+	secondColor.ScaleVec(a, secondColor)
 
 	firstColor.AddVec(firstColor, secondColor)
 	return firstColor

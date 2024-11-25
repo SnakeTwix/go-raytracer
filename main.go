@@ -45,16 +45,16 @@ func main() {
 	viewportV := mat.NewVecDense(3, []float64{0, -viewportHeight, 0})
 
 	pixelDeltaU := mat.NewVecDense(3, nil)
-	pixelDeltaU.ScaleVec(float64(imageWidth), viewportU)
+	pixelDeltaU.ScaleVec(1/float64(imageWidth), viewportU)
 
 	pixelDeltaV := mat.NewVecDense(3, nil)
-	pixelDeltaV.ScaleVec(float64(imageWidth), viewportV)
+	pixelDeltaV.ScaleVec(1/float64(imageHeight), viewportV)
 
 	halfViewportU := mat.NewVecDense(3, nil)
-	halfViewportU.ScaleVec(1/2, viewportU)
+	halfViewportU.ScaleVec(1/2., viewportU)
 
 	halfViewportV := mat.NewVecDense(3, nil)
-	halfViewportV.ScaleVec(1/2, viewportV)
+	halfViewportV.ScaleVec(1/2., viewportV)
 
 	viewportUpperLeft := mat.NewVecDense(3, nil)
 	viewportUpperLeft.SubVec(cameraCenter, focalVec)
