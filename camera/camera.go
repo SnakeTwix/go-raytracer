@@ -33,6 +33,7 @@ type renderLine struct {
 }
 
 func NewDefaultCamera(fileOutput *os.File) Camera {
+	// Some default options, honestly don't feel like documenting all of this yet
 	aspectRatio := 16. / 9.
 	imageHeight := 1080
 	pixelSamplePerPixel := 10
@@ -88,6 +89,7 @@ func NewDefaultCamera(fileOutput *os.File) Camera {
 }
 
 func WriteColor(color *mat.VecDense, buffer io.Writer) {
+	// A function for writing a single pixel to the file
 	r := color.AtVec(0)
 	g := color.AtVec(1)
 	b := color.AtVec(2)
@@ -107,6 +109,7 @@ func WriteColor(color *mat.VecDense, buffer io.Writer) {
 }
 
 func WriteLineColor(line []*mat.VecDense, buffer io.Writer) {
+	// This function writes an entire line to the file, as opposed to one pixel
 	var builder strings.Builder
 
 	for _, color := range line {
@@ -130,14 +133,20 @@ func WriteLineColor(line []*mat.VecDense, buffer io.Writer) {
 }
 
 func (c *Camera) Render(world ray.Hittable) {
-	sendCh := make(chan renderLine, 10)
+	// Okay, this one's a big one
+
+	// Channel for sending a processed line
+	renderLineCh := make(chan renderLine, 10)
+
+	// Receives a value when all of the lines have been processed (i.e. written to the file)
 	renderFinishCh := make(chan struct{})
-	go c.processRenderedLines(sendCh, renderFinishCh)
+	go c.processRenderedLines(renderLineCh, renderFinishCh)
 
 	lineCounter := atomic.Uint64{}
 
 	log.Println("Rendering started")
 
+	// Just write out a ppm header, should probably refactor and put into somewhere else
 	ppmHeader := fmt.Sprintf("P3\n%d %d\n255\n", c.ImageWidth, c.ImageHeight)
 	_, err := c.output.Write([]byte(ppmHeader))
 	if err != nil {
@@ -145,9 +154,12 @@ func (c *Camera) Render(world ray.Hittable) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(c.ImageHeight)
 
-	processLine := func(lineNumberCh <-chan int) {
+	// The main processor of every line
+	lineWorker := func(lineNumberCh <-chan int) {
+
+		// Take each pixel of an assigned line and compute the color of it
+		// With regard to pixel sampling (antialiasing)
 		for j := range lineNumberCh {
 			scanline := make([]*mat.VecDense, 0, c.ImageWidth)
 
@@ -163,27 +175,30 @@ func (c *Camera) Render(world ray.Hittable) {
 				scanline = append(scanline, pixelColor)
 			}
 
-			sendCh <- renderLine{scanlineNumber: j, color: scanline}
-			wg.Done()
+			renderLineCh <- renderLine{scanlineNumber: j, color: scanline}
 
 			log.Printf("Scanline %d done with id %d\n", lineCounter.Load(), j)
 			lineCounter.Add(1)
 		}
+
+		wg.Done()
 	}
 
 	lineNumberCh := make(chan int, 10)
-	for _ = range 8 {
-		go processLine(lineNumberCh)
+	for _ = range 16 {
+		wg.Add(1)
+		go lineWorker(lineNumberCh)
 	}
 
 	for j := 0; j < c.ImageHeight; j++ {
 		//log.Println("Scanlines remaining: ", c.ImageHeight-j)
 		lineNumberCh <- j
 	}
-
 	close(lineNumberCh)
+
 	wg.Wait()
-	close(sendCh)
+	// Need to ensure we've processed all the lines before closing the channel
+	close(renderLineCh)
 
 	<-renderFinishCh
 }
