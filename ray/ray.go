@@ -3,6 +3,7 @@ package ray
 import (
 	"gonum.org/v1/gonum/mat"
 	"math"
+	"raytracer/util"
 )
 
 type Ray struct {
@@ -21,7 +22,7 @@ func (r *Ray) At(t float64) *mat.VecDense {
 func (r *Ray) Color(world Hittable) *mat.VecDense {
 	hitRecord := NewHitRecord()
 
-	if world.Hit(r, 0, math.MaxFloat64, &hitRecord) {
+	if world.Hit(r, util.NewInterval(0, math.MaxFloat64), &hitRecord) {
 		color := mat.NewVecDense(3, []float64{hitRecord.Normal.AtVec(0) + 1, hitRecord.Normal.AtVec(1) + 1, hitRecord.Normal.AtVec(2) + 1})
 		color.ScaleVec(0.5, color)
 

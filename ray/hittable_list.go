@@ -1,5 +1,7 @@
 package ray
 
+import "raytracer/util"
+
 type HittableList struct {
 	objects []Hittable
 }
@@ -18,13 +20,13 @@ func (h *HittableList) Clear() {
 	h.objects = nil
 }
 
-func (h *HittableList) Hit(ray *Ray, rayTmin float64, rayTmax float64, hitRecord *HitRecord) bool {
+func (h *HittableList) Hit(ray *Ray, interval util.Interval, hitRecord *HitRecord) bool {
 	tempRec := NewHitRecord()
 	hitAnything := false
-	closestSoFar := rayTmax
+	closestSoFar := interval.Max
 
 	for _, object := range h.objects {
-		hit := object.Hit(ray, rayTmin, closestSoFar, &tempRec)
+		hit := object.Hit(ray, util.NewInterval(interval.Min, closestSoFar), &tempRec)
 
 		if hit {
 			hitAnything = true

@@ -4,6 +4,7 @@ import (
 	"gonum.org/v1/gonum/mat"
 	"math"
 	"raytracer/ray"
+	"raytracer/util"
 )
 
 type Sphere struct {
@@ -18,7 +19,7 @@ func NewSphere(center *mat.VecDense, radius float64) Sphere {
 	}
 }
 
-func (s *Sphere) Hit(ray *ray.Ray, rayTmin float64, rayTmax float64, hitRecord *ray.HitRecord) bool {
+func (s *Sphere) Hit(ray *ray.Ray, interval util.Interval, hitRecord *ray.HitRecord) bool {
 	oc := mat.NewVecDense(3, nil)
 	oc.SubVec(s.center, ray.Origin)
 
@@ -33,9 +34,9 @@ func (s *Sphere) Hit(ray *ray.Ray, rayTmin float64, rayTmax float64, hitRecord *
 	sqrtd := math.Sqrt(discriminant)
 	root := (h - sqrtd) / a
 
-	if rayTmin >= root || root >= rayTmax {
+	if !interval.Surrounds(root) {
 		root = (h + sqrtd) / a
-		if rayTmin >= root || root >= rayTmax {
+		if !interval.Surrounds(root) {
 			return false
 		}
 	}

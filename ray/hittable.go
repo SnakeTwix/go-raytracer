@@ -2,6 +2,7 @@ package ray
 
 import (
 	"gonum.org/v1/gonum/mat"
+	"raytracer/util"
 )
 
 type HitRecord struct {
@@ -27,5 +28,5 @@ func (h *HitRecord) SetFaceNormal(ray *Ray, normal *mat.VecDense) {
 }
 
 type Hittable interface {
-	Hit(ray *Ray, rayTmin float64, rayTmax float64, hitRecord *HitRecord) bool
+	Hit(ray *Ray, interval util.Interval, hitRecord *HitRecord) bool
 }
