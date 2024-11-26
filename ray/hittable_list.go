@@ -1,4 +1,4 @@
-package hit
+package ray
 
 type HittableList struct {
 	objects []Hittable
@@ -18,8 +18,8 @@ func (h *HittableList) Clear() {
 	h.objects = nil
 }
 
-func (h *HittableList) Hit(ray *Ray, rayTmin float64, rayTmax float64, hitRecord *Record) bool {
-	tempRec := NewRecord()
+func (h *HittableList) Hit(ray *Ray, rayTmin float64, rayTmax float64, hitRecord *HitRecord) bool {
+	tempRec := NewHitRecord()
 	hitAnything := false
 	closestSoFar := rayTmax
 

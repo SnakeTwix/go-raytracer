@@ -6,8 +6,9 @@ import (
 	"io"
 	"log"
 	"os"
-	"raytracer/hit"
+	"path/filepath"
 	"raytracer/objects"
+	"raytracer/ray"
 )
 
 func WriteColor(color *mat.VecDense, buffer io.Writer) {
@@ -31,11 +32,11 @@ func WriteColor(color *mat.VecDense, buffer io.Writer) {
 
 func main() {
 	aspectRatio := 16. / 9.
-	imageHeight := 1024
+	imageHeight := 2160
 	imageWidth := int(aspectRatio * float64(imageHeight))
 
 	// World
-	world := hit.NewHittableList()
+	world := ray.NewHittableList()
 	sphere1 := objects.NewSphere(mat.NewVecDense(3, []float64{0, 0, -1}), 0.5)
 	world.Add(&sphere1)
 
@@ -77,9 +78,12 @@ func main() {
 	startPixel := mat.NewVecDense(3, nil)
 	startPixel.AddVec(viewportUpperLeft, offset)
 
-	file := os.Stdout
+	file := getFile()
 
-	fmt.Printf("P3\n%d %d\n255\n", imageWidth, imageHeight)
+	_, err := file.WriteString(fmt.Sprintf("P3\n%d %d\n255\n", imageWidth, imageHeight))
+	if err != nil {
+		log.Fatal("Failed to write the header of ppm", err)
+	}
 
 	for j := 0; j < imageHeight; j++ {
 		log.Println("Scanlines remaining: ", imageHeight-j)
@@ -97,7 +101,7 @@ func main() {
 			rayDirection := mat.NewVecDense(3, nil)
 			rayDirection.SubVec(pixelCenter, cameraCenter)
 
-			currentRay := hit.Ray{
+			currentRay := ray.Ray{
 				Origin:    cameraCenter,
 				Direction: rayDirection,
 			}
@@ -108,4 +112,23 @@ func main() {
 	}
 
 	log.Println("Done.")
+}
+
+func getFile() *os.File {
+	currentPath, err := os.Getwd()
+	if err != nil {
+		log.Fatal("Couldn't get the current working path", err)
+	}
+
+	filePath := filepath.Join(currentPath, "image.ppm")
+	if len(os.Args) == 2 {
+		filePath = filepath.Join(currentPath, os.Args[1])
+	}
+
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return file
 }

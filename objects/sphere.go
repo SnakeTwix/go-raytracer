@@ -3,7 +3,7 @@ package objects
 import (
 	"gonum.org/v1/gonum/mat"
 	"math"
-	"raytracer/hit"
+	"raytracer/ray"
 )
 
 type Sphere struct {
@@ -18,7 +18,7 @@ func NewSphere(center *mat.VecDense, radius float64) Sphere {
 	}
 }
 
-func (s *Sphere) Hit(ray *hit.Ray, rayTmin float64, rayTmax float64, hitRecord *hit.Record) bool {
+func (s *Sphere) Hit(ray *ray.Ray, rayTmin float64, rayTmax float64, hitRecord *ray.HitRecord) bool {
 	oc := mat.NewVecDense(3, nil)
 	oc.SubVec(s.center, ray.Origin)
 
