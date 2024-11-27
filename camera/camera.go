@@ -25,6 +25,7 @@ type Camera struct {
 	pixelSamplesScale   float64
 	pixelSamplePerPixel int
 	output              io.Writer
+	maxDepth            int
 }
 
 type renderLine struct {
@@ -45,33 +46,33 @@ func NewDefaultCamera(fileOutput *os.File) Camera {
 
 	viewportHeight := 2.
 	viewportWidth := viewportHeight * (float64(imageWidth) / float64(imageHeight))
-	cameraCenter := mat.NewVecDense(3, nil)
+	cameraCenter := util.NewZeroVector()
 
 	viewportU := mat.NewVecDense(3, []float64{viewportWidth, 0, 0})
 	viewportV := mat.NewVecDense(3, []float64{0, -viewportHeight, 0})
 
-	pixelDeltaU := mat.NewVecDense(3, nil)
+	pixelDeltaU := util.NewZeroVector()
 	pixelDeltaU.ScaleVec(1/float64(imageWidth), viewportU)
 
-	pixelDeltaV := mat.NewVecDense(3, nil)
+	pixelDeltaV := util.NewZeroVector()
 	pixelDeltaV.ScaleVec(1/float64(imageHeight), viewportV)
 
-	halfViewportU := mat.NewVecDense(3, nil)
+	halfViewportU := util.NewZeroVector()
 	halfViewportU.ScaleVec(1/2., viewportU)
 
-	halfViewportV := mat.NewVecDense(3, nil)
+	halfViewportV := util.NewZeroVector()
 	halfViewportV.ScaleVec(1/2., viewportV)
 
-	viewportUpperLeft := mat.NewVecDense(3, nil)
+	viewportUpperLeft := util.NewZeroVector()
 	viewportUpperLeft.SubVec(cameraCenter, focalVec)
 	viewportUpperLeft.SubVec(viewportUpperLeft, halfViewportU)
 	viewportUpperLeft.SubVec(viewportUpperLeft, halfViewportV)
 
-	offset := mat.NewVecDense(3, nil)
+	offset := util.NewZeroVector()
 	offset.AddVec(pixelDeltaU, pixelDeltaV)
 	offset.ScaleVec(0.5, offset)
 
-	startPixel := mat.NewVecDense(3, nil)
+	startPixel := util.NewZeroVector()
 	startPixel.AddVec(viewportUpperLeft, offset)
 
 	return Camera{
@@ -85,11 +86,12 @@ func NewDefaultCamera(fileOutput *os.File) Camera {
 		pixelDeltaV:         pixelDeltaV,
 		pixelSamplePerPixel: pixelSamplePerPixel,
 		pixelSamplesScale:   1.0 / float64(pixelSamplePerPixel),
+		maxDepth:            10,
 	}
 }
 
+// WriteColor writes a single pixel to the file
 func WriteColor(color *mat.VecDense, buffer io.Writer) {
-	// A function for writing a single pixel to the file
 	r := color.AtVec(0)
 	g := color.AtVec(1)
 	b := color.AtVec(2)
@@ -108,14 +110,14 @@ func WriteColor(color *mat.VecDense, buffer io.Writer) {
 	}
 }
 
+// WriteLineColor writes an entire line to the file, as opposed to one pixel
 func WriteLineColor(line []*mat.VecDense, buffer io.Writer) {
-	// This function writes an entire line to the file, as opposed to one pixel
 	var builder strings.Builder
 
 	for _, color := range line {
-		r := color.AtVec(0)
-		g := color.AtVec(1)
-		b := color.AtVec(2)
+		r := util.LinearToGamma(color.AtVec(0))
+		g := util.LinearToGamma(color.AtVec(1))
+		b := util.LinearToGamma(color.AtVec(2))
 
 		intensity := util.NewInterval(0, 0.999)
 
@@ -137,11 +139,9 @@ func (c *Camera) Render(world ray.Hittable) {
 
 	// Channel for sending a processed line
 	renderLineCh := make(chan renderLine, 10)
-
 	// Receives a value when all of the lines have been processed (i.e. written to the file)
 	renderFinishCh := make(chan struct{})
 	go c.processRenderedLines(renderLineCh, renderFinishCh)
-
 	lineCounter := atomic.Uint64{}
 
 	log.Println("Rendering started")
@@ -164,11 +164,11 @@ func (c *Camera) Render(world ray.Hittable) {
 			scanline := make([]*mat.VecDense, 0, c.ImageWidth)
 
 			for i := 0; i < c.ImageWidth; i++ {
-				pixelColor := mat.NewVecDense(3, nil)
+				pixelColor := util.NewZeroVector()
 
 				for _ = range c.pixelSamplePerPixel {
 					currentRay := c.getRay(i, j)
-					pixelColor.AddVec(pixelColor, currentRay.Color(world))
+					pixelColor.AddVec(pixelColor, currentRay.Color(world, c.maxDepth))
 				}
 
 				pixelColor.ScaleVec(c.pixelSamplesScale, pixelColor)
@@ -191,15 +191,12 @@ func (c *Camera) Render(world ray.Hittable) {
 	}
 
 	for j := 0; j < c.ImageHeight; j++ {
-		//log.Println("Scanlines remaining: ", c.ImageHeight-j)
 		lineNumberCh <- j
 	}
 	close(lineNumberCh)
-
 	wg.Wait()
 	// Need to ensure we've processed all the lines before closing the channel
 	close(renderLineCh)
-
 	<-renderFinishCh
 }
 
@@ -228,8 +225,8 @@ func (c *Camera) processRenderedLines(renderChannel <-chan renderLine, finish ch
 func (c *Camera) getRay(x, y int) ray.Ray {
 	offset := c.sampleSquare()
 
-	tempVec := mat.NewVecDense(3, nil)
-	rayDirection := mat.NewVecDense(3, nil)
+	tempVec := util.NewZeroVector()
+	rayDirection := util.NewZeroVector()
 	rayDirection.AddVec(rayDirection, c.startPixel)
 
 	tempVec.CopyVec(c.pixelDeltaU)
@@ -241,7 +238,7 @@ func (c *Camera) getRay(x, y int) ray.Ray {
 	tempVec.ScaleVec(float64(y)+offset.AtVec(1), tempVec)
 	rayDirection.AddVec(rayDirection, tempVec)
 
-	rayOrigin := mat.NewVecDense(3, nil)
+	rayOrigin := util.NewZeroVector()
 	rayOrigin.CopyVec(c.center)
 
 	rayDirection.SubVec(rayDirection, rayOrigin)

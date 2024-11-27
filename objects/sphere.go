@@ -20,7 +20,7 @@ func NewSphere(center *mat.VecDense, radius float64) Sphere {
 }
 
 func (s *Sphere) Hit(ray *ray.Ray, interval util.Interval, hitRecord *ray.HitRecord) bool {
-	oc := mat.NewVecDense(3, nil)
+	oc := util.NewZeroVector()
 	oc.SubVec(s.center, ray.Origin)
 
 	a := mat.Dot(ray.Direction, ray.Direction)
@@ -44,10 +44,9 @@ func (s *Sphere) Hit(ray *ray.Ray, interval util.Interval, hitRecord *ray.HitRec
 	hitRecord.Time = root
 	hitRecord.Point = ray.At(hitRecord.Time)
 
-	normal := mat.NewVecDense(3, nil)
+	normal := util.NewZeroVector()
 	normal.SubVec(hitRecord.Point, s.center)
-	// Make it unit
-	normal.ScaleVec(1/s.radius, normal)
+	util.MakeUnitVector(normal)
 	hitRecord.SetFaceNormal(ray, normal)
 
 	return true

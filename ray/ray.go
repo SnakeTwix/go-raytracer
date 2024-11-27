@@ -19,19 +19,36 @@ func (r *Ray) At(t float64) *mat.VecDense {
 	return scaled
 }
 
-func (r *Ray) Color(world Hittable) *mat.VecDense {
+func (r *Ray) Color(world Hittable, depth int) *mat.VecDense {
+	if depth == 0 {
+		// Black color
+		return util.NewZeroVector()
+	}
+
 	hitRecord := NewHitRecord()
 
-	if world.Hit(r, util.NewInterval(0, math.MaxFloat64), &hitRecord) {
-		color := mat.NewVecDense(3, []float64{hitRecord.Normal.AtVec(0) + 1, hitRecord.Normal.AtVec(1) + 1, hitRecord.Normal.AtVec(2) + 1})
-		color.ScaleVec(0.5, color)
+	if world.Hit(r, util.NewInterval(0.001, math.MaxFloat64), &hitRecord) {
 
+		//color := mat.NewVecDense(3, []float64{hitRecord.Normal.AtVec(0) + 1, hitRecord.Normal.AtVec(1) + 1, hitRecord.Normal.AtVec(2) + 1})
+		//color.ScaleVec(0.5, color)
+		//return color
+
+		direction := util.NewRandomUnitVector()
+		direction.AddVec(direction, hitRecord.Normal)
+
+		newRayBounce := Ray{
+			Origin:    hitRecord.Point,
+			Direction: direction,
+		}
+
+		color := newRayBounce.Color(world, depth-1)
+		color.ScaleVec(0.5, color)
 		return color
 	}
 
-	unitDir := mat.NewVecDense(3, nil)
-	// Unit again
-	unitDir.ScaleVec(1/r.Direction.Norm(2), r.Direction)
+	unitDir := util.NewZeroVector()
+	unitDir.CopyVec(r.Direction)
+	util.MakeUnitVector(unitDir)
 	a := 0.5 * (unitDir.AtVec(1) + 1.0)
 
 	firstColor := mat.NewVecDense(3, []float64{1, 1, 1.})
